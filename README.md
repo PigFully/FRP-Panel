@@ -53,7 +53,7 @@
 curl -fsSL https://github.com/PigFully/FRP-Panel/releases/latest/download/install-panel.sh | bash
 ```
 
-- 交互询问：数据库连接地址（默认 `localhost`）、端口（默认 `3306`）、库名、账户、密码，以及面板监听端口（回车随机高位端口）。
+- 交互询问：数据库连接地址（默认 `127.0.0.1`）、端口（默认 `3306`）、库名、账户、密码，以及面板监听端口（回车随机高位端口）。
 - 自动测试连接、迁移、创建 `admin`（随机 16 位密码，仅显示一次）、启用 BBR、安装 systemd 服务。
 - 结束输出访问地址与端口；随时在 SSH 输入 `frppanel` 可回看安装信息，`frppanel resetpw` 重置管理员密码。
 

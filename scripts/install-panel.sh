@@ -150,7 +150,9 @@ asksecret() {
   read -rsp "数据库密码: " ans </dev/tty || true; echo; eval "$var=\"\$ans\""
 }
 log "请输入 MySQL 连接信息（数据库需已创建，直接回车使用括号内默认值）"
-ask FRPANEL_MYSQL_HOST "数据库连接地址" "localhost"
+# 默认 127.0.0.1 而非 localhost：部分主机 localhost 仅解析到 ::1，而 MySQL 常只
+# 监听 IPv4，会得到 "dial tcp [::1]:3306: connection refused"。
+ask FRPANEL_MYSQL_HOST "数据库连接地址" "127.0.0.1"
 ask FRPANEL_MYSQL_PORT "数据库端口（MySQL 默认 3306）" "3306"
 ask FRPANEL_MYSQL_DB   "数据库名"   "frpanel"
 ask FRPANEL_MYSQL_USER "数据库账户" "frpanel"

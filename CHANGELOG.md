@@ -2,6 +2,11 @@
 
 本项目遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## v1.2.1 — 2026-08-25
+
+### 修复
+- **安装脚本数据库地址默认值由 `localhost` 改为 `127.0.0.1`**：部分主机的 `localhost` 仅解析到 IPv6 `::1`，而 MySQL/MariaDB 常只监听 IPv4，面板会以 `dial tcp [::1]:3306: connection refused` 连不上库（2026-08-25 生产事故中即为该报错形态）。已有安装不受影响；如需修改，编辑 `/etc/frp-panel/config.yaml` 的 `mysql.host`。
+
 ## v1.2.0 — 2026-08-25
 
 首个 GitHub 公开版本（包含未单独发布的 v1.1.1 全部修复）。
