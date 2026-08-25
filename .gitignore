@@ -1,0 +1,14 @@
+# build outputs
+/bin/
+/dist/
+/frpanel-agent
+/frpanel-panel
+*.exe
+
+# frontend
+web/node_modules/
+web/dist/
+
+# local junk
+*.log
+.DS_Store

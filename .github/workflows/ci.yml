@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+
+# The release job creates a GitHub Release; that needs write access to repo
+# contents. New repos default the workflow token to read-only, so grant it here.
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Build web (SPA embedded by the panel)
+        working-directory: web
+        run: |
+          corepack pnpm install --frozen-lockfile
+          corepack pnpm audit --prod || true
+          corepack pnpm run typecheck
+          corepack pnpm run build
+
+      - name: Go vet
+        run: go vet ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        # Advisory, same as the Makefile's optional lint: findings are surfaced
+        # in the job log but must not block a tagged release build.
+        continue-on-error: true
+        with:
+          version: latest
+
+      - name: Go test
+        run: go test -race ./internal/...
+
+      - name: Cross build binaries
+        run: |
+          mkdir -p dist
+          VER=${GITHUB_REF_NAME}
+          LD="-s -w -X github.com/frpanel/frpanel/internal/version.Version=${VER} -X github.com/frpanel/frpanel/internal/version.Commit=${GITHUB_SHA::7} -X github.com/frpanel/frpanel/internal/version.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          for a in amd64 arm64; do
+            CGO_ENABLED=0 GOOS=linux GOARCH=$a go build -trimpath -ldflags "$LD" -o dist/frpanel-panel-$a ./panel
+            CGO_ENABLED=0 GOOS=linux GOARCH=$a go build -trimpath -ldflags "$LD" -o dist/frpanel-agent-$a ./agent
+          done
+          cp scripts/install-agent.sh scripts/install-panel.sh dist/
+          echo "${VER}" > dist/VERSION
+
+      # The install scripts fetch frpc-<arch>/frps-<arch> from the same BASE as
+      # the panel/agent binaries, so the release must carry the pinned frp too.
+      - name: Bundle pinned frp binaries (frpc/frps)
+        run: |
+          FRPV=0.61.1
+          for a in amd64 arm64; do
+            curl -fsSL --retry 3 -o /tmp/frp-$a.tar.gz \
+              "https://github.com/fatedier/frp/releases/download/v${FRPV}/frp_${FRPV}_linux_${a}.tar.gz"
+            tar -xzf /tmp/frp-$a.tar.gz -C /tmp
+            install -m755 /tmp/frp_${FRPV}_linux_${a}/frpc dist/frpc-$a
+            install -m755 /tmp/frp_${FRPV}_linux_${a}/frps dist/frps-$a
+          done
+
+      - name: Checksums
+        run: cd dist && sha256sum frpanel-* frpc-* frps-* > sha256sums.txt
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frpanel-dist
+          path: dist/
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4 # for CHANGELOG.md (body_path)
+      - uses: actions/download-artifact@v4
+        with:
+          name: frpanel-dist
+          path: dist
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          body_path: CHANGELOG.md
